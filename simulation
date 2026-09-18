@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Force Lab</title>
+<style>
+  :root{
+    --paper:#eef1ee;
+    --card:#ffffff;
+    --ink:#16202a;
+    --ink-soft:#5a6b79;
+    --rule:#cfd8de;
+    --rule-soft:#e4eaee;
+    --applied:#c8321a;
+    --friction:#8a6a2f;
+    --net:#1c3d5a;
+    --velocity:#0f6fbd;
+    --weight:#5d4a7a;
+    --normal:#1c3d5a;
+    --crate:#c98f4a;
+    --crate-dark:#8a5f2c;
+    --dist:#1f7a4d;
+    --dist-fill:#d6efdf;
+  }
+  :root:not([data-theme="light"]){ color-scheme: light; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Inter","Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+    font-size:16px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .masthead{
+    padding:14px 22px; border-bottom:2px solid var(--ink);
+    display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; background:var(--card);
+  }
+  .masthead h1{ margin:0; font-size:1.5rem; font-weight:750; letter-spacing:-0.015em; }
+  .masthead p{ margin:0; color:var(--ink-soft); font-size:.95rem; }
+
+  .wrap{ display:grid; grid-template-columns:minmax(0,1fr) 330px; align-items:start; }
+  @media (max-width:1000px){ .wrap{ grid-template-columns:1fr; } }
+
+  .stage{ padding:18px 22px 24px; min-width:0; }
+  .scene{ background:var(--card); border:1px solid var(--rule); border-radius:4px; overflow:hidden; }
+  .scene svg{ display:block; width:100%; height:auto; }
+
+  .timer-strip{
+    display:flex; align-items:center; gap:14px; padding:10px 14px;
+    background:var(--card); border:1px solid var(--rule); border-top:none; flex-wrap:wrap;
+  }
+  .timer-face{ font-variant-numeric:tabular-nums; font-size:1.9rem; font-weight:750; letter-spacing:-0.02em; min-width:5.2ch; }
+  .timer-bar{ flex:1; min-width:110px; height:9px; background:var(--rule-soft); border-radius:99px; overflow:hidden; }
+  .timer-fill{ height:100%; width:0%; background:var(--applied); transition:width .06s linear; }
+  .timer-note{ color:var(--ink-soft); font-size:.85rem; }
+
+  .readouts{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    margin-top:15px; border:1px solid var(--rule); background:var(--card);
+  }
+  .cell{ padding:11px 13px; border-right:1px solid var(--rule-soft); }
+  .cell:last-child{ border-right:none; }
+  .cell .k{ font-size:.78rem; color:var(--ink-soft); }
+  .cell .v{ font-size:1.42rem; font-weight:730; font-variant-numeric:tabular-nums; letter-spacing:-0.02em; margin-top:1px; }
+  .v.vel{ color:var(--velocity); } .v.app{ color:var(--applied); }
+  .v.fri{ color:var(--friction); } .v.net{ color:var(--net); }
+  .v.dst{ color:var(--dist); }
+
+  .panel{ padding:18px 22px 24px 0; }
+  @media (max-width:1000px){ .panel{ padding:0 22px 24px; } }
+  .group{ background:var(--card); border:1px solid var(--rule); margin-bottom:13px; }
+  .group > h2{
+    margin:0; font-size:.85rem; font-weight:700; padding:9px 14px;
+    border-bottom:1px solid var(--rule-soft); background:#f7f9f8;
+  }
+  .group .body{ padding:13px 14px; }
+
+  .field{ margin-bottom:13px; }
+  .field:last-child{ margin-bottom:0; }
+  .field > .lab{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:.92rem; margin-bottom:6px; }
+  .field .num{ font-variant-numeric:tabular-nums; font-weight:720; }
+  input[type=range]{ width:100%; accent-color:var(--applied); margin:0; }
+  .scale{ display:flex; justify-content:space-between; font-size:.74rem; color:var(--ink-soft); margin-top:2px; }
+
+  .seg{ display:flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden; }
+  .seg button{ flex:1; border:none; background:var(--card); color:var(--ink-soft); padding:8px 6px; font:inherit; font-size:.87rem; cursor:pointer; }
+  .seg button + button{ border-left:1px solid var(--rule); }
+  .seg button[aria-pressed="true"]{ background:var(--ink); color:#fff; font-weight:650; }
+
+  select{ width:100%; font:inherit; padding:7px 9px; border:1px solid var(--rule); border-radius:3px; background:var(--card); color:var(--ink); }
+
+  .runbar{ display:flex; gap:9px; }
+  .runbar button{ flex:1; font:inherit; font-weight:700; font-size:.98rem; padding:13px 10px; border-radius:3px; cursor:pointer; border:1px solid var(--ink); }
+  #runBtn{ background:var(--applied); border-color:var(--applied); color:#fff; }
+  #resetBtn{ background:var(--card); color:var(--ink); }
+  button:disabled{ opacity:.42; cursor:not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible{ outline:3px solid var(--velocity); outline-offset:1px; }
+
+  .checkrow{ display:flex; align-items:center; gap:8px; font-size:.9rem; margin-top:9px; }
+  .checkrow input{ width:16px; height:16px; accent-color:var(--net); }
+
+  .stalled{ margin-top:12px; padding:10px 13px; border-left:4px solid var(--friction); background:#fbf6ec; font-size:.9rem; display:none; }
+  .stalled.show{ display:block; }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>Force Lab</h1>
+  <p>Set it up, run it for a fixed time, read the numbers.</p>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="scene">
+      <svg id="scene" viewBox="0 0 820 340" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Crate being pushed along a track"></svg>
+    </div>
+
+    <div class="timer-strip">
+      <div class="timer-face" id="timerFace">0.00</div>
+      <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="timer-note" id="timerNote">Timer starts and stops with the run.</div>
+    </div>
+
+    <div class="readouts">
+      <div class="cell"><div class="k">Velocity</div><div class="v vel" id="rVel">0.0 m/s</div></div>
+      <div class="cell"><div class="k">Distance</div><div class="v dst" id="rDist">0.0 m</div></div>
+      <div class="cell"><div class="k">Applied force</div><div class="v app" id="rApp">0 N</div></div>
+      <div class="cell"><div class="k">Friction force</div><div class="v fri" id="rFri">0 N</div></div>
+      <div class="cell"><div class="k">Net force</div><div class="v net" id="rNet">0 N</div></div>
+      <div class="cell"><div class="k">Acceleration</div><div class="v" id="rAcc">0.0 m/s&sup2;</div></div>
+    </div>
+
+    <div class="stalled" id="stalledMsg"></div>
+  </div>
+
+  <div class="panel">
+    <div class="group">
+      <h2>The push</h2>
+      <div class="body">
+        <div class="field">
+          <div class="lab"><label for="force">Applied force</label><span class="num" id="forceNum">100 N</span></div>
+          <input type="range" id="force" min="0" max="1000" step="10" value="100">
+          <div class="scale"><span>0</span><span>1000 N</span></div>
+        </div>
+        <div class="field">
+          <div class="lab"><span>Direction</span></div>
+          <div class="seg" id="dirSeg">
+            <button type="button" data-v="-1" aria-pressed="false">&larr; Left</button>
+            <button type="button" data-v="1" aria-pressed="true">Right &rarr;</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="lab"><span>How the force is applied</span></div>
+          <div class="seg" id="modeSeg">
+            <button type="button" data-v="continuous" aria-pressed="true">Keeps pushing</button>
+            <button type="button" data-v="single" aria-pressed="false">One quick push</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>The setup</h2>
+      <div class="body">
+        <div class="field">
+          <div class="lab"><label for="mass">Mass of the crate</label></div>
+          <select id="mass">
+            <option value="10">10 kg</option>
+            <option value="25">25 kg</option>
+            <option value="50" selected>50 kg</option>
+            <option value="100">100 kg</option>
+            <option value="200">200 kg</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="lab"><label for="friction">Friction</label><span class="num" id="fricNum">none</span></div>
+          <input type="range" id="friction" min="0" max="0.5" step="0.05" value="0">
+          <div class="scale"><span>none</span><span>lots</span></div>
+        </div>
+        <div class="field">
+          <div class="lab"><label for="duration">Trial length</label><span class="num" id="durNum">3.0 s</span></div>
+          <input type="range" id="duration" min="1" max="10" step="0.5" value="3">
+          <div class="scale"><span>1 s</span><span>10 s</span></div>
+        </div>
+        <div class="checkrow">
+          <input type="checkbox" id="showVertical">
+          <label for="showVertical">Show gravity and normal force</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="body">
+        <div class="runbar">
+          <button id="runBtn" type="button">Run trial</button>
+          <button id="resetBtn" type="button">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+const NS = "http://www.w3.org/2000/svg";
+const G = 9.8;
+const PUSH_WINDOW = 0.4;
+
+const VIEW_W = 820, VIEW_H = 340;
+const PX_PER_M   = 12;
+const ORIGIN_X   = 410;   // crate starts dead centre
+const EDGE_RIGHT = 680;
+const EDGE_LEFT  = 140;
+const GROUND_Y   = 250;
+const VEL_Y      = 44;    // velocity arrow rides along the top, clear of everything
+
+const scene = document.getElementById('scene');
+const timerFace = document.getElementById('timerFace');
+const timerFill = document.getElementById('timerFill');
+const timerNote = document.getElementById('timerNote');
+const rVel = document.getElementById('rVel');
+const rDist = document.getElementById('rDist');
+const rApp = document.getElementById('rApp');
+const rFri = document.getElementById('rFri');
+const rNet = document.getElementById('rNet');
+const rAcc = document.getElementById('rAcc');
+const stalledMsg = document.getElementById('stalledMsg');
+
+const forceInput = document.getElementById('force');
+const forceNum = document.getElementById('forceNum');
+const massSel = document.getElementById('mass');
+const fricInput = document.getElementById('friction');
+const fricNum = document.getElementById('fricNum');
+const durInput = document.getElementById('duration');
+const durNum = document.getElementById('durNum');
+const showVert = document.getElementById('showVertical');
+const runBtn = document.getElementById('runBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+let dir = 1;
+let mode = 'continuous';
+
+let running = false, finished = false;
+let t = 0, v = 0, x = 0, camX = 0;
+let rafId = null, lastStamp = 0;
+let liveApplied = 0, liveFriction = 0, liveNet = 0, liveAcc = 0;
+let stalled = false;
+
+/* ---------------- physics ---------------- */
+
+function appliedNow(){
+  if (!running) return 0;
+  if (mode === 'single' && t > PUSH_WINDOW) return 0;
+  return Number(forceInput.value) * dir;
+}
+
+function step(dt){
+  const m = Number(massSel.value);
+  const mu = Number(fricInput.value);
+  const maxStatic = mu * m * G;
+  const Fa = appliedNow();
+  let Ff = 0;
+
+  if (Math.abs(v) < 1e-4){
+    if (Math.abs(Fa) <= maxStatic){
+      Ff = -Fa; v = 0;
+      stalled = mu > 0 && Math.abs(Fa) > 0;
+    } else {
+      Ff = -Math.sign(Fa) * maxStatic; stalled = false;
+    }
+  } else {
+    Ff = -Math.sign(v) * maxStatic; stalled = false;
+  }
+
+  const a = (Fa + Ff) / m;
+  const vNext = v + a * dt;
+  if (Math.abs(Fa) <= maxStatic && v !== 0 && Math.sign(vNext) !== Math.sign(v)){
+    v = 0;
+  } else {
+    v = vNext;
+  }
+
+  liveApplied = Fa; liveFriction = Ff; liveNet = Fa + Ff; liveAcc = a;
+  x += v * dt;
+
+  const screen = ORIGIN_X + (x - camX) * PX_PER_M;
+  if (screen > EDGE_RIGHT) camX += (screen - EDGE_RIGHT) / PX_PER_M;
+  if (screen < EDGE_LEFT)  camX += (screen - EDGE_LEFT) / PX_PER_M;
+}
+
+/* ---------------- drawing helpers ---------------- */
+
+function el(name, attrs){
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+function worldToScreen(wx){ return ORIGIN_X + (wx - camX) * PX_PER_M; }
+
+// text with a solid backing plate, so crossing arrows never make a number unreadable
+function chipText(cx, cy, str, color, size, anchor){
+  const g = el('g', {});
+  const w = str.length * size * 0.56 + 10;
+  const h = size + 8;
+  let rx = cx - w/2;
+  if (anchor === 'start') rx = cx - 5;
+  if (anchor === 'end')   rx = cx - w + 5;
+  g.appendChild(el('rect', {
+    x:rx, y:cy - h + 5, width:w, height:h,
+    fill:'#ffffff', opacity:0.88, rx:3
+  }));
+  const tn = el('text', {
+    x:cx, y:cy, fill:color, 'font-size':size, 'font-weight':700,
+    'text-anchor': anchor || 'middle'
+  });
+  tn.textContent = str;
+  g.appendChild(tn);
+  return g;
+}
+
+function hArrow(px, py, len, color, label){
+  const g = el('g', {});
+  if (Math.abs(len) < 1) return g;
+  const x2 = px + len;
+  const s = Math.sign(len), h = 13;
+  g.appendChild(el('line', {x1:px, y1:py, x2:x2, y2:py, stroke:color, 'stroke-width':7}));
+  g.appendChild(el('polygon', {
+    points:`${x2 - s*h},${py-9} ${x2 - s*h},${py+9} ${x2 + s*3},${py}`, fill:color
+  }));
+  if (label) g.appendChild(chipText(x2 + s*8, py - 13, label, color, 16, s > 0 ? 'end' : 'start'));
+  return g;
+}
+
+function vArrow(px, py, len, color, label, labelPos){
+  const g = el('g', {});
+  if (Math.abs(len) < 1) return g;
+  const y2 = py + len;
+  const s = Math.sign(len), h = 13;
+  g.appendChild(el('line', {x1:px, y1:py, x2:px, y2:y2, stroke:color, 'stroke-width':7}));
+  g.appendChild(el('polygon', {
+    points:`${px-9},${y2 - s*h} ${px+9},${y2 - s*h} ${px},${y2 + s*3}`, fill:color
+  }));
+  if (label){
+    if (labelPos === 'right'){
+      g.appendChild(chipText(px + 14, y2 + 5, label, color, 15, 'start'));
+    } else if (labelPos === 'below'){
+      g.appendChild(chipText(px, y2 + 24, label, color, 15, 'middle'));
+    } else {
+      g.appendChild(chipText(px, y2 - 12, label, color, 15, 'middle'));
+    }
+  }
+  return g;
+}
+
+/* ---------------- scene ---------------- */
+
+function draw(){
+  while (scene.firstChild) scene.removeChild(scene.firstChild);
+
+  scene.appendChild(el('rect', {x:0, y:0, width:VIEW_W, height:GROUND_Y, fill:'#f4f8fa'}));
+
+  const gg = el('g', {});
+  gg.appendChild(el('rect', {x:0, y:GROUND_Y, width:VIEW_W, height:VIEW_H-GROUND_Y, fill:'#e6ded2'}));
+  const firstMark = Math.floor((camX - (ORIGIN_X / PX_PER_M)) / 5) * 5;
+  for (let wx = firstMark; worldToScreen(wx) < VIEW_W + 40; wx += 5){
+    const sx = worldToScreen(wx);
+    if (sx < -60) continue;
+    gg.appendChild(el('rect', {x:sx, y:GROUND_Y, width:26, height:VIEW_H-GROUND_Y, fill:'#dbd0c0'}));
+    const lbl = el('text', {x:sx, y:VIEW_H - 8, 'font-size':12, fill:'#8d8270', 'text-anchor':'middle'});
+    lbl.textContent = wx + ' m';
+    gg.appendChild(lbl);
+  }
+  gg.appendChild(el('line', {x1:0, y1:GROUND_Y, x2:VIEW_W, y2:GROUND_Y, stroke:'#9c8f7d', 'stroke-width':3}));
+  scene.appendChild(gg);
+
+  const m = Number(massSel.value);
+  const side = 58 + Math.log10(m) * 22;
+  const crateX = worldToScreen(x);
+  const cy = GROUND_Y - side/2;
+  const startScreen = worldToScreen(0);
+
+  // distance band along the ground
+  if (Math.abs(x) > 0.05){
+    const bandY = GROUND_Y + 8;
+    const cl = Math.max(-10, Math.min(startScreen, crateX));
+    const cr = Math.min(VIEW_W + 10, Math.max(startScreen, crateX));
+    const band = el('g', {});
+    band.appendChild(el('rect', {
+      x:cl, y:bandY, width:Math.max(0, cr-cl), height:18,
+      fill:'var(--dist-fill)', stroke:'var(--dist)', 'stroke-width':1.5
+    }));
+    band.appendChild(el('line', {x1:cl+1, y1:bandY+9, x2:cr-1, y2:bandY+9, stroke:'var(--dist)', 'stroke-width':2}));
+    [[cl+1,1],[cr-1,-1]].forEach(([ex, s]) => {
+      band.appendChild(el('polygon', {
+        points:`${ex + s*9},${bandY+3} ${ex + s*9},${bandY+15} ${ex},${bandY+9}`, fill:'var(--dist)'
+      }));
+    });
+    band.appendChild(chipText(
+      Math.min(VIEW_W - 60, Math.max(60, (cl+cr)/2)), bandY + 44,
+      Math.abs(x).toFixed(1) + ' m travelled', 'var(--dist)', 17, 'middle'
+    ));
+    scene.appendChild(band);
+  }
+
+  // start line
+  if (startScreen > -20 && startScreen < VIEW_W + 20){
+    const sl = el('g', {});
+    sl.appendChild(el('line', {
+      x1:startScreen, y1:GROUND_Y - side - 20, x2:startScreen, y2:GROUND_Y + 28,
+      stroke:'var(--dist)', 'stroke-width':2, 'stroke-dasharray':'6 5'
+    }));
+    sl.appendChild(chipText(startScreen, GROUND_Y - side - 26, 'start', 'var(--dist)', 13, 'middle'));
+    scene.appendChild(sl);
+  }
+
+  // crate
+  const crate = el('g', {});
+  crate.appendChild(el('rect', {
+    x:crateX - side/2, y:GROUND_Y - side, width:side, height:side,
+    fill:'var(--crate)', stroke:'var(--crate-dark)', 'stroke-width':3, rx:3
+  }));
+  crate.appendChild(el('line', {x1:crateX-side/2, y1:GROUND_Y-side, x2:crateX+side/2, y2:GROUND_Y, stroke:'var(--crate-dark)', 'stroke-width':2, opacity:.55}));
+  crate.appendChild(el('line', {x1:crateX+side/2, y1:GROUND_Y-side, x2:crateX-side/2, y2:GROUND_Y, stroke:'var(--crate-dark)', 'stroke-width':2, opacity:.55}));
+  scene.appendChild(crate);
+
+  // vertical forces leave a gap around the middle so the mass label stays clear
+  const LABEL_GAP = 19;
+  if (showVert.checked){
+    const wLen = 34 + (Math.log10(m) - 1) / (Math.log10(200) - 1) * 40;
+    scene.appendChild(vArrow(crateX, cy - LABEL_GAP, -wLen, 'var(--normal)', Math.round(m*G) + ' N up', 'above'));
+    // the downward arrow stops short of the ground, and its label sits beside the tip,
+    // so it never lands on the distance band below
+    const downLen = Math.min(wLen, (GROUND_Y - 12) - (cy + LABEL_GAP));
+    scene.appendChild(vArrow(crateX, cy + LABEL_GAP, downLen, 'var(--weight)', Math.round(m*G) + ' N down', 'right'));
+  }
+
+  // mass label in the centre of the crate, inside that gap
+  scene.appendChild(chipText(crateX, cy + 6, m + ' kg', '#4a3213', 15, 'middle'));
+
+  const scale = 0.12;
+  if (Math.abs(liveApplied) > 0.5){
+    scene.appendChild(hArrow(crateX + Math.sign(liveApplied)*side/2, cy - 14,
+      liveApplied*scale, 'var(--applied)', Math.round(Math.abs(liveApplied)) + ' N'));
+  }
+  if (Math.abs(liveFriction) > 0.5){
+    scene.appendChild(hArrow(crateX + Math.sign(liveFriction)*side/2, cy + 18,
+      liveFriction*scale, 'var(--friction)', Math.round(Math.abs(liveFriction)) + ' N'));
+  }
+
+  // velocity rides along the top of the frame
+  if (Math.abs(v) > 0.05){
+    const vLen = Math.max(-190, Math.min(190, v * 9));
+    scene.appendChild(hArrow(crateX, VEL_Y, vLen, 'var(--velocity)', Math.abs(v).toFixed(1) + ' m/s'));
+  }
+
+  const lg = el('text', {x:16, y:24, 'font-size':15, fill:'#5a6b79'});
+  lg.textContent = running ? 'Running' : (finished ? 'Trial finished' : 'Ready');
+  scene.appendChild(lg);
+}
+
+/* ---------------- readouts ---------------- */
+
+function fmtN(n){
+  const r = Math.round(Math.abs(n));
+  return r === 0 ? '0 N' : r + ' N ' + (n > 0 ? 'right' : 'left');
+}
+function fmtV(n){
+  if (Math.abs(n) < 0.05) return '0.0 m/s';
+  return Math.abs(n).toFixed(1) + ' m/s ' + (n > 0 ? 'right' : 'left');
+}
+
+function paint(){
+  rVel.textContent = fmtV(v);
+  rDist.textContent = Math.abs(x).toFixed(1) + ' m';
+  rApp.textContent = fmtN(liveApplied);
+  rFri.textContent = fmtN(liveFriction);
+  rNet.textContent = fmtN(liveNet);
+  rAcc.textContent = (Math.abs(liveAcc) < 0.05 ? '0.0' : liveAcc.toFixed(1)) + ' m/s\u00B2';
+  timerFace.textContent = t.toFixed(2);
+  timerFill.style.width = Math.min(100, (t / Number(durInput.value)) * 100) + '%';
+
+  if (stalled){
+    stalledMsg.classList.add('show');
+    stalledMsg.textContent = 'The push is not strong enough to overcome friction, so the crate does not move. Try more force, less friction, or less mass.';
+  } else {
+    stalledMsg.classList.remove('show');
+  }
+}
+
+/* ---------------- run loop ---------------- */
+
+function frame(stamp){
+  if (!running) return;
+  let dt = (stamp - lastStamp) / 1000;
+  lastStamp = stamp;
+  if (dt > 0.05) dt = 0.05;
+
+  const dur = Number(durInput.value);
+  if (t + dt >= dur){
+    step(dur - t);
+    t = dur;
+    finish();
+    return;
+  }
+  t += dt;
+  step(dt);
+  draw(); paint();
+  rafId = requestAnimationFrame(frame);
+}
+
+function startRun(){
+  if (running) return;
+  running = true; finished = false; stalled = false;
+  t = 0; v = 0; x = 0; camX = 0;
+  runBtn.disabled = true; runBtn.textContent = 'Running…';
+  lastStamp = performance.now();
+  rafId = requestAnimationFrame(frame);
+}
+
+function finish(){
+  running = false; finished = true;
+  cancelAnimationFrame(rafId);
+  liveApplied = 0;
+  liveNet = liveFriction;
+  runBtn.disabled = false;
+  runBtn.textContent = 'Run trial';
+  timerNote.textContent = 'Trial finished. Read the end speed and distance.';
+  draw(); paint();
+}
+
+function resetAll(){
+  running = false; finished = false;
+  cancelAnimationFrame(rafId);
+  t = 0; v = 0; x = 0; camX = 0;
+  liveApplied = liveFriction = liveNet = liveAcc = 0;
+  stalled = false;
+  runBtn.disabled = false;
+  runBtn.textContent = 'Run trial';
+  timerNote.textContent = mode === 'single'
+    ? 'One push lasts ' + PUSH_WINDOW.toFixed(1) + ' s, then the crate is on its own.'
+    : 'Timer starts and stops with the run.';
+  draw(); paint();
+}
+
+/* ---------------- wiring ---------------- */
+
+function segment(id, apply){
+  const box = document.getElementById(id);
+  box.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || running) return;
+    box.querySelectorAll('button').forEach(z => z.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+    apply(b.dataset.v);
+    draw();
+  });
+}
+
+segment('dirSeg', val => { dir = Number(val); });
+segment('modeSeg', val => {
+  mode = val;
+  timerNote.textContent = val === 'single'
+    ? 'One push lasts ' + PUSH_WINDOW.toFixed(1) + ' s, then the crate is on its own.'
+    : 'Timer starts and stops with the run.';
+});
+
+forceInput.addEventListener('input', () => { forceNum.textContent = forceInput.value + ' N'; });
+massSel.addEventListener('change', draw);
+fricInput.addEventListener('input', () => {
+  const val = Number(fricInput.value);
+  fricNum.textContent = val === 0 ? 'none' : val.toFixed(2);
+});
+durInput.addEventListener('input', () => {
+  durNum.textContent = Number(durInput.value).toFixed(1) + ' s';
+  paint();
+});
+showVert.addEventListener('change', draw);
+
+runBtn.addEventListener('click', startRun);
+resetBtn.addEventListener('click', resetAll);
+
+draw(); paint();
+})();
+</script>
+</body>
+</html>
